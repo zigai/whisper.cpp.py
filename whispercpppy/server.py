@@ -1,21 +1,21 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import Literal
 
+import requests
 from pydantic import BaseModel, Field
+
+from whispercpppy.response_types import InferenceJSONVerbose
 
 
 class VoiceActivityDetectionOptions(BaseModel):
     enable: bool = Field(default=False, description="--vad")
     model: str | None = Field(default=None, description="--vad-model")
     threshold: float = Field(default=0.50, description="--vad-threshold")
-    min_speech_duration_ms: int = Field(
-        default=250, description="--vad-min-speech-duration-ms"
-    )
-    min_silence_duration_ms: int = Field(
-        default=100, description="--vad-min-silence-duration-ms"
-    )
+    min_speech_duration_ms: int = Field(default=250, description="--vad-min-speech-duration-ms")
+    min_silence_duration_ms: int = Field(default=100, description="--vad-min-silence-duration-ms")
     max_speech_duration_s: float = Field(
         default=float("inf"), description="--vad-max-speech-duration-s"
     )
@@ -81,18 +81,7 @@ def field_to_cli_arg(flag: str, value) -> list[str] | None:
     return [flag, str(value)]
 
 
-ResponseFormat = Literal["json"]
-
-
-class InferenceRequest(BaseModel):
-    file: Path
-    temperature: float = Field(default=0.0)
-    temperature_inc: float = Field(default=0.2)
-    response_format: ResponseFormat = Field(default="json")
-
-
-class LoadRequest(BaseModel):
-    model: Path
+ResponseFormat = Literal["json", "verbose_json", "srt", "vtt", "text", "tsv"]
 
 
 def generate_start_server_command(
@@ -113,8 +102,104 @@ def generate_start_server_command(
         for name, info in VoiceActivityDetectionOptions.model_fields.items():
             desc = info.description
             assert desc is not None
-            arg = field_to_cli_arg(desc, getattr(server_opts, name))
+            arg = field_to_cli_arg(desc, getattr(vad_opts, name))
             if arg is None:
                 continue
             command.extend(arg)
     return command
+
+
+class WhisperCppServer:
+    def __init__(
+        self,
+        server_options: WhisperCppServerOptions,
+        vad_options: VoiceActivityDetectionOptions | None,
+        binary: str = "whisper-server",
+        autostart: bool = True,
+    ) -> None:
+        self._server_options = server_options
+        self._vad_options = vad_options
+        self._binary = binary
+        self._process: subprocess.Popen[str] | None = None
+        self._base_url = f"http://{server_options.host}:{server_options.port}"
+        if autostart:
+            self.start()
+
+    def start(self) -> None:
+        if self._process is not None and self.is_running():
+            return
+        command = generate_start_server_command(
+            self._server_options,
+            self._vad_options,
+            self._binary,
+        )
+        self._process = subprocess.Popen(command)
+
+    def __del__(self) -> None:
+        try:
+            self.stop()
+        except Exception:
+            pass
+
+    def stop(self) -> None:
+        if self._process is None:
+            return
+        if self._process.poll() is None:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+                self._process.wait()
+        self._process = None
+
+    def _get_url(self, path: str) -> str:
+        segments: list[str] = []
+        base_path = self._server_options.request_path
+        if base_path:
+            segments.append(base_path.strip("/"))
+        normalized = path.strip("/")
+        if normalized:
+            segments.append(normalized)
+        if not segments:
+            return self._base_url
+        return f"{self._base_url}/{'/'.join(segments)}"
+
+    def is_running(self) -> bool:
+        if self._process is None:
+            return False
+        return self._process.poll() is None
+
+    def inference(
+        self,
+        file: Path,
+        temperature: float = 0.0,
+        temperature_inc: float = 0.2,
+    ) -> InferenceJSONVerbose:
+        if not self.is_running():
+            raise RuntimeError("WhisperCPP server is not running")
+        url = self._get_url(self._server_options.inference_path)
+        with file.open("rb") as file_handle:
+            response = requests.post(
+                url,
+                files={"file": (file.name, file_handle)},
+                data={
+                    "temperature": str(temperature),
+                    "temperature_inc": str(temperature_inc),
+                    "response_format": "verbose_json",
+                },
+            )
+        response.raise_for_status()
+        response_json = response.json()
+        return InferenceJSONVerbose(**response_json)
+
+    def load(self, model: Path) -> requests.Response:
+        if not self.is_running():
+            raise RuntimeError("WhisperCPP server is not running")
+        url = self._get_url("load")
+        response = requests.post(
+            url,
+            files={"model": (None, str(model))},
+        )
+        response.raise_for_status()
+        return response
