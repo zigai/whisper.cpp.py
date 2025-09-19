@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import requests
 from pydantic import BaseModel, Field
@@ -24,6 +24,12 @@ class VoiceActivityDetectionOptions(BaseModel):
     )
     speech_pad_ms: int = Field(default=30, description="--vad-speech-pad-ms")
     samples_overlap_s: float = Field(default=0.10, description="--vad-samples-overlap")
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump()
+
+    def hash(self) -> int:
+        return hash(str(self.to_dict()))
 
 
 class WhisperCppServerOptions(BaseModel):
@@ -55,7 +61,7 @@ class WhisperCppServerOptions(BaseModel):
     language: str = Field(default="en", description="--language")
     detect_language: bool = Field(default=False, description="--detect-language")
     prompt: str = Field(default="", description="--prompt")
-    model: str = Field(default="models/ggml-base.en.bin", description="--model")
+    model: str = Field(default="base.en", description="--model")
     ov_e_device: str = Field(default="CPU", description="--ov-e-device")
     dtw_model: str | None = Field(default=None, description="--dtw")
     host: str = Field(default="127.0.0.1", description="--host")

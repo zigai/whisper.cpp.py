@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,8 +42,12 @@ AVAILABLE_MODELS: list[str] = [
 class DownloadResult:
     model: str
     url: str
-    dest: Path
+    filepath: Path
     existed: bool
+
+
+def get_env_models_dir() -> str | None:
+    return os.environ.get("WHISPERCPP_MODELS_DIR")
 
 
 def get_script_path() -> Path:
@@ -65,10 +70,6 @@ def is_valid_model(model: str) -> bool:
     return model in AVAILABLE_MODELS
 
 
-def model_filename(model: str) -> str:
-    return f"ggml-{model}.bin"
-
-
 def build_model_url(model: str) -> str:
     if "tdrz" in model:
         base_url = "https://huggingface.co/akashmjn/tinydiarize-whisper.cpp"
@@ -85,7 +86,7 @@ def prepare_download(model: str, models_dir: Path | None = None) -> tuple[str, P
     download_dir = models_dir or default_download_path()
     download_dir.mkdir(parents=True, exist_ok=True)
     url = build_model_url(model)
-    savepath = download_dir / model_filename(model)
+    savepath = download_dir / model
     return url, savepath
 
 
@@ -166,10 +167,10 @@ def download_model(
     url, savepath = prepare_download(model, models_dir)
     existed = savepath.is_file()
     if existed and not overwrite:
-        return DownloadResult(model=model, url=url, dest=savepath, existed=True)
+        return DownloadResult(model=model, url=url, filepath=savepath, existed=True)
     print(f"downloading {model} to {savepath.resolve()}")
     stream_download(url, savepath, timeout=timeout)
-    return DownloadResult(model=model, url=url, dest=savepath, existed=existed)
+    return DownloadResult(model=model, url=url, filepath=savepath, existed=existed)
 
 
 __all__ = ["download_model", "AVAILABLE_MODELS"]
