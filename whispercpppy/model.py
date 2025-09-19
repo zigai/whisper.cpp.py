@@ -95,15 +95,61 @@ def stream_download(
     timeout: float | None = None,
 ) -> None:
     tmp = savepath.with_suffix(savepath.suffix + ".tmp")
+    progress_printed = False
     try:
         with requests.get(url, stream=True, timeout=timeout) as r:
             r.raise_for_status()
+            total = int(r.headers.get("Content-Length", 0) or 0)
+            chunk_size = 64 * 1024
+            report_every = max(total // 100, chunk_size) if total else 1_000_000
+            next_report = report_every
+            downloaded = 0
+            mb = 1_000_000
+
             with open(tmp, "wb") as f:
-                for chunk in r.iter_content():
-                    if chunk:
-                        f.write(chunk)
+                for chunk in r.iter_content(chunk_size=chunk_size):
+                    if not chunk:
+                        continue
+                    f.write(chunk)
+                    downloaded += len(chunk)
+
+                    if total:
+                        if downloaded >= next_report or downloaded >= total:
+                            percent = min(int(downloaded * 100 / total), 100)
+                            current_mb = downloaded / mb
+                            total_mb = total / mb
+                            print(
+                                f"  {percent:3d}% ({current_mb:.1f}/{total_mb:.1f} MB)",
+                                end="\r",
+                                flush=True,
+                            )
+                            progress_printed = True
+                            next_report = min(total, downloaded + report_every)
+                    else:
+                        if downloaded >= next_report:
+                            current_mb = downloaded / mb
+                            print(
+                                f"  downloaded {current_mb:.1f} MB",
+                                end="\r",
+                                flush=True,
+                            )
+                            progress_printed = True
+                            next_report = downloaded + report_every
+
+            if total:
+                total_mb = total / mb
+                downloaded_mb = downloaded / mb
+                print(
+                    f"  100% ({downloaded_mb:.1f}/{total_mb:.1f} MB)",
+                    flush=True,
+                )
+            else:
+                downloaded_mb = downloaded / mb
+                print(f"  downloaded {downloaded_mb:.1f} MB", flush=True)
         tmp.replace(savepath)
     except Exception:
+        if progress_printed:
+            print()
         if tmp.exists():
             tmp.unlink(missing_ok=True)
         raise
@@ -111,14 +157,17 @@ def stream_download(
 
 def download_model(
     model: str,
-    models_dir: Path | None = None,
+    models_dir: Path | str | None = None,
     overwrite: bool = False,
     timeout: float | None = None,
 ) -> DownloadResult:
+    if isinstance(models_dir, str):
+        models_dir = Path(models_dir)
     url, savepath = prepare_download(model, models_dir)
     existed = savepath.is_file()
     if existed and not overwrite:
         return DownloadResult(model=model, url=url, dest=savepath, existed=True)
+    print(f"downloading {model} to {savepath.resolve()}")
     stream_download(url, savepath, timeout=timeout)
     return DownloadResult(model=model, url=url, dest=savepath, existed=existed)
 
