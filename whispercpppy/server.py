@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -116,12 +117,25 @@ class WhisperCppServer:
         vad_options: VoiceActivityDetectionOptions | None,
         binary: str = "whisper-server",
         autostart: bool = True,
+        ready_timeout_s: float | None = 30.0,
+        ready_check_interval_s: float = 0.25,
+        ready_probe_timeout_s: float = 1.0,
     ) -> None:
+        if ready_check_interval_s <= 0:
+            raise ValueError("'ready_check_interval_s' must be positive")
+        if ready_probe_timeout_s <= 0:
+            raise ValueError("'ready_probe_timeout_s' must be positive")
+        if ready_timeout_s is not None and ready_timeout_s < 0:
+            raise ValueError("'ready_timeout_s' must be non-negative or None")
+
         self._server_options = server_options
         self._vad_options = vad_options
         self._binary = binary
         self._process: subprocess.Popen[str] | None = None
         self._base_url = f"http://{server_options.host}:{server_options.port}"
+        self._ready_timeout = ready_timeout_s
+        self._ready_interval = ready_check_interval_s
+        self._ready_probe_timeout = ready_probe_timeout_s
         if autostart:
             self.start()
 
@@ -133,7 +147,7 @@ class WhisperCppServer:
             self._vad_options,
             self._binary,
         )
-        self._process = subprocess.Popen(command)
+        self._process = subprocess.Popen(command)  # type:ignore
 
     def __del__(self) -> None:
         try:
@@ -170,14 +184,60 @@ class WhisperCppServer:
             return False
         return self._process.poll() is None
 
+    def is_ready(self) -> bool:
+        if not self.is_running():
+            return False
+        url = self._get_url("")
+        try:
+            response = requests.head(url, timeout=self._ready_probe_timeout)
+        except requests.RequestException:
+            return False
+        if response.status_code < 500:
+            return True
+        if response.status_code in (405, 501):
+            try:
+                response = requests.get(url, timeout=self._ready_probe_timeout)
+            except requests.RequestException:
+                return False
+            return response.status_code < 500
+        return False
+
+    def _wait_until_ready(
+        self,
+        timeout_s: float | None = None,
+        poll_interval_s: float | None = None,
+    ) -> None:
+        if poll_interval_s is None:
+            poll_interval_s = self._ready_interval
+        if poll_interval_s is None or poll_interval_s <= 0:
+            raise ValueError("'poll_interval_s' must be positive")
+
+        deadline: float | None
+        if timeout_s is None:
+            timeout_s = self._ready_timeout
+        if timeout_s is None:
+            deadline = None
+        else:
+            if timeout_s < 0:
+                raise ValueError("'timeout_s' must be non-negative or None")
+            deadline = time.monotonic() + timeout_s
+
+        while True:
+            if self.is_ready():
+                return
+            if not self.is_running():
+                raise RuntimeError("WhisperCPP server process exited before it became ready")
+            if deadline is not None and time.monotonic() >= deadline:
+                raise TimeoutError("Timed out waiting for WhisperCPP server to become ready")
+            time.sleep(poll_interval_s)
+
     def inference(
         self,
         file: Path,
         temperature: float = 0.0,
         temperature_inc: float = 0.2,
     ) -> InferenceJSONVerbose:
-        if not self.is_running():
-            raise RuntimeError("WhisperCPP server is not running")
+        self._wait_until_ready()
         url = self._get_url(self._server_options.inference_path)
         with file.open("rb") as file_handle:
             response = requests.post(
@@ -194,8 +254,7 @@ class WhisperCppServer:
         return InferenceJSONVerbose(**response_json)
 
     def load(self, model: Path) -> requests.Response:
-        if not self.is_running():
-            raise RuntimeError("WhisperCPP server is not running")
+        self._wait_until_ready()
         url = self._get_url("load")
         response = requests.post(
             url,
