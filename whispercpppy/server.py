@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Literal
@@ -83,6 +85,67 @@ def field_to_cli_arg(flag: str, value) -> list[str] | None:
 
 
 ResponseFormat = Literal["json", "verbose_json", "srt", "vtt", "text", "tsv"]
+
+VIDEO_EXT = {
+    ".mp4",
+    ".mkv",
+    ".mov",
+    ".avi",
+    ".webm",
+    ".flv",
+    ".wmv",
+    ".m4v",
+}
+
+
+def is_video_file(path: Path) -> bool:
+    return path.suffix.lower() in VIDEO_EXT
+
+
+def convert_video_to_audio(path: Path) -> Path:
+    fd, temp_path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    audio_path = Path(temp_path)
+
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "warning",
+        "-y",
+        "-i",
+        str(path),
+        "-vn",
+        "-acodec",
+        "pcm_s16le",
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+        str(audio_path),
+    ]
+
+    try:
+        subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+    except FileNotFoundError as exc:
+        audio_path.unlink(missing_ok=True)
+        raise RuntimeError(
+            "ffmpeg is required to convert video files to audio but was not found"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        audio_path.unlink(missing_ok=True)
+        stderr = exc.stderr.decode(errors="ignore") if exc.stderr else ""
+        raise RuntimeError(
+            "ffmpeg failed to convert video file to audio"
+            + (f": {stderr.strip()}" if stderr else "")
+        ) from exc
+
+    return audio_path
 
 
 def generate_start_server_command(
@@ -239,19 +302,30 @@ class WhisperCppServer:
     ) -> InferenceJSONVerbose:
         self._wait_until_ready()
         url = self._get_url(self._server_options.inference_path)
-        with file.open("rb") as file_handle:
-            response = requests.post(
-                url,
-                files={"file": (file.name, file_handle)},
-                data={
-                    "temperature": str(temperature),
-                    "temperature_inc": str(temperature_inc),
-                    "response_format": "verbose_json",
-                },
-            )
-        response.raise_for_status()
-        response_json = response.json()
-        return InferenceJSONVerbose(**response_json)
+
+        upload_path = file
+        temp_audio_path: Path | None = None
+        if is_video_file(file):
+            temp_audio_path = convert_video_to_audio(file)
+            upload_path = temp_audio_path
+
+        try:
+            with upload_path.open("rb") as file_handle:
+                response = requests.post(
+                    url,
+                    files={"file": (upload_path.name, file_handle)},
+                    data={
+                        "temperature": str(temperature),
+                        "temperature_inc": str(temperature_inc),
+                        "response_format": "verbose_json",
+                    },
+                )
+            response.raise_for_status()
+            response_json = response.json()
+            return InferenceJSONVerbose(**response_json)
+        finally:
+            if temp_audio_path is not None:
+                temp_audio_path.unlink(missing_ok=True)
 
     def load(self, model: Path) -> requests.Response:
         self._wait_until_ready()
@@ -262,3 +336,6 @@ class WhisperCppServer:
         )
         response.raise_for_status()
         return response
+
+
+__all__ = ["WhisperCppServer", "WhisperCppServerOptions", "VoiceActivityDetectionOptions"]
