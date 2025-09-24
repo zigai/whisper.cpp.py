@@ -302,12 +302,14 @@ class WhisperCppServer:
 
     def inference(
         self,
-        file: Path,
+        file: Path | str,
         temperature: float = 0.0,
         temperature_inc: float = 0.2,
     ) -> InferenceJSONVerbose:
         self._wait_until_ready()
         url = self._get_url(self._server_options.inference_path)
+        if isinstance(file, str):
+            file = Path(file)
 
         upload_path = file
         temp_audio_path: Path | None = None
@@ -333,7 +335,7 @@ class WhisperCppServer:
             if temp_audio_path is not None:
                 temp_audio_path.unlink(missing_ok=True)
 
-    def load(self, model: Path) -> requests.Response:
+    def load(self, model: Path | str) -> requests.Response:
         self._wait_until_ready()
         url = self._get_url("load")
         response = requests.post(
