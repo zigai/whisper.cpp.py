@@ -261,14 +261,14 @@ class WhisperCppServer:
             response = requests.head(url, timeout=self._ready_probe_timeout)
         except requests.RequestException:
             return False
-        if response.status_code < 500:
+        if 200 <= response.status_code < 400:
             return True
         if response.status_code in (405, 501):
             try:
                 response = requests.get(url, timeout=self._ready_probe_timeout)
             except requests.RequestException:
                 return False
-            return response.status_code < 500
+            return 200 <= response.status_code < 400
         return False
 
     def _wait_until_ready(
