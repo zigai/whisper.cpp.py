@@ -9,6 +9,8 @@ dependencies = ["pydantic>=2.11.9", "requests>=2.32.5"]
 classifiers = []
 keywords = []
 
+[project.scripts]
+whisper-cpp-download = "whispercpppy.cli:cli"
 
 [build-system]
 requires = ["hatchling"]

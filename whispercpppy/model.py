@@ -50,20 +50,12 @@ def get_env_models_dir() -> str | None:
     return os.environ.get("WHISPERCPP_MODELS_DIR")
 
 
-def get_script_path() -> Path:
-    try:
-        return Path(__file__).resolve().parent
-    except NameError:
-        return Path.cwd()
-
-
-def default_download_path(
-    script_dir: Path | None = None,
-    cwd: Path | None = None,
-) -> Path:
-    sd = script_dir or get_script_path()
-    wd = cwd or Path.cwd()
-    return wd if sd.name == "bin" else sd
+def default_download_path(cwd: Path | None = None) -> Path:
+    if env_models_dir := get_env_models_dir():
+        download_path = Path(env_models_dir)
+        download_path.mkdir(parents=True, exist_ok=True)
+        return download_path
+    return cwd or Path.cwd()
 
 
 def is_valid_model(model: str) -> bool:
