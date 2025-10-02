@@ -20,7 +20,8 @@ class VoiceActivityDetectionOptions(BaseModel):
     min_speech_duration_ms: int = Field(default=250, description="--vad-min-speech-duration-ms")
     min_silence_duration_ms: int = Field(default=100, description="--vad-min-silence-duration-ms")
     max_speech_duration_s: float = Field(
-        default=float("inf"), description="--vad-max-speech-duration-s"
+        default=float("inf"),
+        description="--vad-max-speech-duration-s",
     )
     speech_pad_ms: int = Field(default=30, description="--vad-speech-pad-ms")
     samples_overlap_s: float = Field(default=0.10, description="--vad-samples-overlap")
@@ -308,6 +309,7 @@ class WhisperCppServer:
     ) -> InferenceJSONVerbose:
         self._wait_until_ready()
         url = self._get_url(self._server_options.inference_path)
+
         if isinstance(file, str):
             file = Path(file)
 

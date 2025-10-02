@@ -53,6 +53,8 @@ def get_env_models_dir() -> str | None:
 def default_download_path(cwd: Path | None = None) -> Path:
     if env_models_dir := get_env_models_dir():
         download_path = Path(env_models_dir)
+        if not download_path.is_absolute():
+            raise ValueError("'WHISPERCPP_MODELS_DIR' must be an absolute path")
         download_path.mkdir(parents=True, exist_ok=True)
         return download_path
     return cwd or Path.cwd()
