@@ -186,7 +186,7 @@ class WhisperCppServer:
         server_options: WhisperCppServerOptions,
         vad_options: VoiceActivityDetectionOptions | None,
         binary: str = "whisper-server",
-        autostart: bool = True,
+        autostart: bool = False,
         ready_timeout_s: float | None = 30.0,
         ready_check_interval_s: float = 0.25,
         ready_probe_timeout_s: float = 1.0,
@@ -198,14 +198,17 @@ class WhisperCppServer:
         if ready_timeout_s is not None and ready_timeout_s < 0:
             raise ValueError("'ready_timeout_s' must be non-negative or None")
 
-        self._server_options = server_options
-        self._vad_options = vad_options
-        self._binary = binary
-        self._process: subprocess.Popen[str] | None = None
-        self._base_url = f"http://{server_options.host}:{server_options.port}"
         self._ready_timeout = ready_timeout_s
         self._ready_interval = ready_check_interval_s
         self._ready_probe_timeout = ready_probe_timeout_s
+
+        self._server_options = server_options
+        self._vad_options = vad_options
+
+        self._binary = binary
+        self._process: subprocess.Popen[str] | None = None
+        self._base_url = f"http://{server_options.host}:{server_options.port}"
+
         if autostart:
             self.start()
 
@@ -228,6 +231,7 @@ class WhisperCppServer:
     def stop(self) -> None:
         if self._process is None:
             return
+
         if self._process.poll() is None:
             self._process.terminate()
             try:
@@ -235,18 +239,23 @@ class WhisperCppServer:
             except subprocess.TimeoutExpired:
                 self._process.kill()
                 self._process.wait()
+
         self._process = None
 
     def _get_url(self, path: str) -> str:
         segments: list[str] = []
+
         base_path = self._server_options.request_path
         if base_path:
             segments.append(base_path.strip("/"))
+
         normalized = path.strip("/")
         if normalized:
             segments.append(normalized)
+
         if not segments:
             return self._base_url
+
         return f"{self._base_url}/{'/'.join(segments)}"
 
     def is_running(self) -> bool:
@@ -257,19 +266,23 @@ class WhisperCppServer:
     def is_ready(self) -> bool:
         if not self.is_running():
             return False
+
         url = self._get_url("")
         try:
             response = requests.head(url, timeout=self._ready_probe_timeout)
         except requests.RequestException:
             return False
+
         if 200 <= response.status_code < 400:
             return True
+
         if response.status_code in (405, 501):
             try:
                 response = requests.get(url, timeout=self._ready_probe_timeout)
             except requests.RequestException:
                 return False
             return 200 <= response.status_code < 400
+
         return False
 
     def _wait_until_ready(
@@ -291,6 +304,9 @@ class WhisperCppServer:
             if timeout_s < 0:
                 raise ValueError("'timeout_s' must be non-negative or None")
             deadline = time.monotonic() + timeout_s
+
+        if not self.is_running():
+            self.start()
 
         while True:
             if self.is_ready():
