@@ -78,7 +78,7 @@ class WhisperCppServerOptions(BaseModel):
     flash_attn: bool = Field(default=False, description="--flash-attn")
 
 
-def field_to_cli_arg(flag: str, value) -> list[str] | None:
+def field_to_cli_arg(flag: str, value: Any) -> list[str] | None:
     if value is None:
         return None
     if type(value) is bool:
@@ -206,7 +206,7 @@ class WhisperCppServer:
         self._vad_options = vad_options
 
         self._binary = binary
-        self._process: subprocess.Popen[str] | None = None
+        self._process: subprocess.Popen[bytes] | None = None
         self._base_url = f"http://{server_options.host}:{server_options.port}"
 
         if autostart:
@@ -220,7 +220,7 @@ class WhisperCppServer:
             self._vad_options,
             self._binary,
         )
-        self._process = subprocess.Popen(command)  # type:ignore
+        self._process = subprocess.Popen(command)
 
     def __del__(self) -> None:
         try:
