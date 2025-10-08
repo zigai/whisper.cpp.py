@@ -109,7 +109,7 @@ def is_video_file(path: Path) -> bool:
     return path.suffix.lower() in VIDEO_EXT
 
 
-def convert_video_to_audio(path: Path) -> Path:
+def video_to_mono16k_wav(path: Path) -> Path:
     fd, temp_path = tempfile.mkstemp(suffix=".wav")
     os.close(fd)
     audio_path = Path(temp_path)
@@ -332,7 +332,7 @@ class WhisperCppServer:
         upload_path = file
         temp_audio_path: Path | None = None
         if is_video_file(file):
-            temp_audio_path = convert_video_to_audio(file)
+            temp_audio_path = video_to_mono16k_wav(file)
             upload_path = temp_audio_path
 
         try:
