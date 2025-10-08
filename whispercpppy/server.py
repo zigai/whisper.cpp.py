@@ -184,7 +184,7 @@ class WhisperCppServer:
     def __init__(
         self,
         server_options: WhisperCppServerOptions,
-        vad_options: VoiceActivityDetectionOptions | None,
+        vad_options: VoiceActivityDetectionOptions | None = None,
         binary: str = "whisper-server",
         autostart: bool = False,
         ready_timeout_s: float | None = 30.0,

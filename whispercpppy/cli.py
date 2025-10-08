@@ -22,8 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="directory",
         type=Path,
         help=(
-            "save directory for models. "
-            "defaults to the path set by WHISPERCPP_MODELS_DIR or the current directory."
+            "save directory for models. defaults to the path set by WHISPERCPP_MODELS_DIR env var or the current directory if not set"
         ),
         metavar="\b",
     )
@@ -62,4 +61,5 @@ def cli() -> int:
 
 
 if __name__ == "__main__":
+    cli()
     cli()
