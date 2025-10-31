@@ -23,7 +23,8 @@ classifiers = [
 keywords = ["whisper", "whisper-server", "whisper-cpp", "whisper-cpp-python"]
 
 [project.scripts]
-whisper-cpp-download = "whispercpppy.cli:cli"
+whispercpp-download = "whispercpppy.cli:model_cli"
+whispercpp-download-vad = "whispercpppy.cli:vad_model_cli"
 
 [project.optional-dependencies]
 test = ["pytest", "coverage"]

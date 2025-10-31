@@ -2,28 +2,39 @@ from __future__ import annotations
 
 import argparse
 import os
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from whispercpppy.model import AVAILABLE_MODELS, default_download_path, download_model
+from whispercpppy.model import (
+    AVAILABLE_MODELS,
+    DownloadResult,
+    default_download_path,
+    download_model,
+)
+from whispercpppy.vad_model import AVAILABLE_VAD_MODELS, download_vad_model
 
 
-def build_parser() -> argparse.ArgumentParser:
-    models_text = [f" - {name}" for name in AVAILABLE_MODELS]
+def create_parser(
+    available_models: Sequence[str],
+    *,
+    description_header: str,
+    dir_help: str,
+    models_arg_help: str,
+) -> argparse.ArgumentParser:
+    models_text = [f" - {name}" for name in available_models]
     model_choices = "\n".join(models_text)
-    description = f"download whisper.cpp GGUF models\n\navailable models:\n{model_choices}"
+    description = f"{description_header}\n\navailable models:\n{model_choices}"
     parser = argparse.ArgumentParser(
         description=description,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("models", help="model names", nargs="+")
+    parser.add_argument("models", help=models_arg_help, nargs="+")
     parser.add_argument(
         "-d",
         "--dir",
         dest="directory",
         type=Path,
-        help=(
-            "save directory for models. defaults to the path set by WHISPERCPP_MODELS_DIR env var or the current directory if not set"
-        ),
+        help=dir_help,
         metavar="\b",
     )
     parser.add_argument(
@@ -43,16 +54,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def cli() -> int:
-    parser = build_parser()
+def run_cli(
+    parser: argparse.ArgumentParser,
+    downloader: Callable[[str, Path | str | None, bool, float | None], DownloadResult],
+) -> int:
     args = parser.parse_args()
     download_dir = args.directory or default_download_path()
     for model_name in args.models:
-        result = download_model(
+        result = downloader(
             model_name,
-            models_dir=download_dir,
-            overwrite=args.overwrite,
-            timeout=args.timeout,
+            download_dir,
+            args.overwrite,
+            args.timeout,
         )
 
         if result.existed and not args.overwrite:
@@ -60,5 +73,29 @@ def cli() -> int:
     return os.EX_OK
 
 
-if __name__ == "__main__":
-    cli()
+def build_model_download_parser() -> argparse.ArgumentParser:
+    dir_help = "save directory for models. defaults to the path set by WHISPERCPP_MODELS_DIR env var or the current directory if not set"
+    return create_parser(
+        AVAILABLE_MODELS,
+        description_header="download whisper.cpp GGUF models",
+        dir_help=dir_help,
+        models_arg_help="model names",
+    )
+
+
+def build_vad_download_parser() -> argparse.ArgumentParser:
+    dir_help = "save directory for VAD models. defaults to the path set by WHISPERCPP_MODELS_DIR env var or the current directory if not set"
+    return create_parser(
+        AVAILABLE_VAD_MODELS,
+        description_header="download whisper.cpp VAD GGUF models",
+        dir_help=dir_help,
+        models_arg_help="VAD model names",
+    )
+
+
+def model_cli() -> int:
+    return run_cli(build_model_download_parser(), download_model)
+
+
+def vad_model_cli() -> int:
+    return run_cli(build_vad_download_parser(), download_vad_model)

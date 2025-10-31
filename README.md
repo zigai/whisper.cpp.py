@@ -27,8 +27,8 @@ transcript = whisper.inference("/path/to/audio/or/video/file")
 
 ## GGUF model download helper
 
-```
-whisper-cpp-download --help
+```text
+whispercpp-download --help
 usage: whisper-cpp-download [-h] [-d] [-o] [-t] models [models ...]
 
 download whisper.cpp GGUF models
