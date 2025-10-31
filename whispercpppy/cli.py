@@ -62,4 +62,3 @@ def cli() -> int:
 
 if __name__ == "__main__":
     cli()
-    cli()
