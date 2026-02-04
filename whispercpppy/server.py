@@ -62,7 +62,7 @@ class WhisperCppServerOptions(BaseModel):
     language: str = Field(default="en", description="--language")
     detect_language: bool = Field(default=False, description="--detect-language")
     prompt: str = Field(default="", description="--prompt")
-    model: str = Field(default="base.en", description="--model")
+    model: str = Field(default="models/ggml-base.en.bin", description="--model")
     ov_e_device: str = Field(default="CPU", description="--ov-e-device")
     dtw_model: str | None = Field(default=None, description="--dtw")
     host: str = Field(default="127.0.0.1", description="--host")
@@ -71,11 +71,17 @@ class WhisperCppServerOptions(BaseModel):
     request_path: str = Field(default="", description="--request-path")
     inference_path: str = Field(default="/inference", description="--inference-path")
     convert_audio: bool = Field(default=False, description="--convert")
+    tmp_dir: str = Field(default=".", description="--tmp-dir")
     suppress_nst: bool = Field(default=False, description="--suppress-nst")
     no_speech_thold: float = Field(default=0.60, description="--no-speech-thold")
-    no_context: bool = Field(default=False, description="--no-context")
     no_gpu: bool = Field(default=False, description="--no-gpu")
-    flash_attn: bool = Field(default=False, description="--flash-attn")
+    device: int = Field(default=0, description="--device")
+    flash_attn: bool = Field(default=True, description="--flash-attn")
+    no_flash_attn: bool = Field(default=False, description="--no-flash-attn")
+    no_language_probabilities: bool = Field(
+        default=False,
+        description="--no-language-probabilities",
+    )
 
 
 def field_to_cli_arg(flag: str, value: Any) -> list[str] | None:
@@ -162,6 +168,8 @@ def generate_start_server_command(
 ) -> list[str]:
     command: list[str] = [binary]
     for name, info in WhisperCppServerOptions.model_fields.items():
+        if name == "flash_attn" and server_opts.no_flash_attn:
+            continue
         desc = info.description
         assert desc is not None
         arg = field_to_cli_arg(desc, getattr(server_opts, name))

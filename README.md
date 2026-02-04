@@ -19,7 +19,7 @@ pip install git+https://github.com/zigai/whisper.cpp.py
 ```python
 from whispercpppy import WhisperCppServer, WhisperCppServerOptions
 
-opts = WhisperCppServerOptions()
+opts = WhisperCppServerOptions(model="models/ggml-base.en.bin")
 whisper = WhisperCppServer(opts)
 
 transcript = whisper.inference("/path/to/audio/or/video/file")

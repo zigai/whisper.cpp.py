@@ -32,8 +32,8 @@ class InferenceJSONVerbose(BaseModel):
     text: str
     segments: list[Segment]
     detected_language: str
-    detected_language_probability: float
-    language_probabilities: dict[CountryCode, float]
+    detected_language_probability: float | None = None
+    language_probabilities: dict[CountryCode, float] | None = None
 
 
 CountryCode = Literal[
