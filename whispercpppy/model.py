@@ -101,7 +101,7 @@ def stream_download(
             downloaded = 0
             mb = 1_000_000
 
-            with open(tmp, "wb") as f:
+            with tmp.open("wb") as f:
                 for chunk in r.iter_content(chunk_size=chunk_size):
                     if not chunk:
                         continue
@@ -120,16 +120,15 @@ def stream_download(
                             )
                             progress_printed = True
                             next_report = min(total, downloaded + report_every)
-                    else:
-                        if downloaded >= next_report:
-                            current_mb = downloaded / mb
-                            print(
-                                f"  downloaded {current_mb:.1f} MB",
-                                end="\r",
-                                flush=True,
-                            )
-                            progress_printed = True
-                            next_report = downloaded + report_every
+                    elif downloaded >= next_report:
+                        current_mb = downloaded / mb
+                        print(
+                            f"  downloaded {current_mb:.1f} MB",
+                            end="\r",
+                            flush=True,
+                        )
+                        progress_printed = True
+                        next_report = downloaded + report_every
 
             if total:
                 total_mb = total / mb
@@ -167,4 +166,4 @@ def download_model(
     return DownloadResult(model=model, url=url, filepath=savepath, existed=existed)
 
 
-__all__ = ["download_model", "AVAILABLE_MODELS"]
+__all__ = ["AVAILABLE_MODELS", "download_model"]

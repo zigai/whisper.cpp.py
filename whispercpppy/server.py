@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import tempfile
 import time
@@ -84,15 +85,17 @@ class WhisperCppServerOptions(BaseModel):
     )
 
 
-def field_to_cli_arg(flag: str, value: Any) -> list[str] | None:
+CLIArgValue = bool | int | float | str | None
+
+
+def field_to_cli_arg(flag: str, value: CLIArgValue) -> list[str] | None:
     if value is None:
         return None
-    if type(value) is bool:
+    if isinstance(value, bool):
         if value:
             return [flag]
-        else:
-            return None
-    if type(value) is str and value == "":
+        return None
+    if isinstance(value, str) and value == "":
         return None
     return [flag, str(value)]
 
@@ -115,13 +118,36 @@ def is_video_file(path: Path) -> bool:
     return path.suffix.lower() in VIDEO_EXT
 
 
+def resolve_executable(command: str) -> str:
+    candidate = Path(command).expanduser()
+    if candidate.parent != Path():
+        if not candidate.exists():
+            raise RuntimeError(f"Executable not found: {command}")
+        if not os.access(candidate, os.X_OK):
+            raise RuntimeError(f"Executable is not executable: {command}")
+        return str(candidate.resolve())
+
+    resolved_command = shutil.which(command)
+    if resolved_command is None:
+        raise RuntimeError(f"Executable not found in PATH: {command}")
+    return resolved_command
+
+
 def video_to_mono16k_wav(path: Path) -> Path:
     fd, temp_path = tempfile.mkstemp(suffix=".wav")
     os.close(fd)
     audio_path = Path(temp_path)
 
+    try:
+        ffmpeg_command = resolve_executable("ffmpeg")
+    except RuntimeError as exc:
+        audio_path.unlink(missing_ok=True)
+        raise RuntimeError(
+            "ffmpeg is required to convert video files to audio but was not found"
+        ) from exc
+
     command = [
-        "ffmpeg",
+        ffmpeg_command,
         "-hide_banner",
         "-loglevel",
         "warning",
@@ -139,7 +165,7 @@ def video_to_mono16k_wav(path: Path) -> Path:
     ]
 
     try:
-        subprocess.run(
+        subprocess.run(  # noqa: S603 - resolved executable with arg list
             command,
             check=True,
             stdout=subprocess.DEVNULL,
@@ -198,6 +224,7 @@ class WhisperCppServer:
         ready_timeout_s: float | None = 30.0,
         ready_check_interval_s: float = 0.25,
         ready_probe_timeout_s: float = 1.0,
+        request_timeout_s: float | None = None,
     ) -> None:
         if ready_check_interval_s <= 0:
             raise ValueError("'ready_check_interval_s' must be positive")
@@ -205,10 +232,13 @@ class WhisperCppServer:
             raise ValueError("'ready_probe_timeout_s' must be positive")
         if ready_timeout_s is not None and ready_timeout_s < 0:
             raise ValueError("'ready_timeout_s' must be non-negative or None")
+        if request_timeout_s is not None and request_timeout_s <= 0:
+            raise ValueError("'request_timeout_s' must be positive or None")
 
         self._ready_timeout = ready_timeout_s
         self._ready_interval = ready_check_interval_s
         self._ready_probe_timeout = ready_probe_timeout_s
+        self._request_timeout = request_timeout_s
 
         self._server_options = server_options
         self._vad_options = vad_options
@@ -226,15 +256,17 @@ class WhisperCppServer:
         command = generate_start_server_command(
             self._server_options,
             self._vad_options,
-            self._binary,
+            resolve_executable(self._binary),
         )
-        self._process = subprocess.Popen(command)
+        self._process = subprocess.Popen(  # noqa: S603 - resolved executable with arg list
+            command
+        )
 
     def __del__(self) -> None:
         try:
             self.stop()
-        except Exception:
-            pass
+        except (AttributeError, OSError, subprocess.SubprocessError):
+            return
 
     def stop(self) -> None:
         if self._process is None:
@@ -293,37 +325,37 @@ class WhisperCppServer:
 
         return False
 
+    def _resolve_poll_interval(self, poll_interval_s: float | None) -> float:
+        interval = self._ready_interval if poll_interval_s is None else poll_interval_s
+        if interval <= 0:
+            raise ValueError("'poll_interval_s' must be positive")
+        return interval
+
+    def _resolve_deadline(self, timeout_s: float | None) -> float | None:
+        timeout = self._ready_timeout if timeout_s is None else timeout_s
+        if timeout is not None and timeout < 0:
+            raise ValueError("'timeout_s' must be non-negative or None")
+        if timeout is None:
+            return None
+        return time.monotonic() + timeout
+
     def _wait_until_ready(
         self,
         timeout_s: float | None = None,
         poll_interval_s: float | None = None,
     ) -> None:
-        if poll_interval_s is None:
-            poll_interval_s = self._ready_interval
-        if poll_interval_s is None or poll_interval_s <= 0:
-            raise ValueError("'poll_interval_s' must be positive")
-
-        deadline: float | None
-        if timeout_s is None:
-            timeout_s = self._ready_timeout
-        if timeout_s is None:
-            deadline = None
-        else:
-            if timeout_s < 0:
-                raise ValueError("'timeout_s' must be non-negative or None")
-            deadline = time.monotonic() + timeout_s
+        poll_interval = self._resolve_poll_interval(poll_interval_s)
+        deadline = self._resolve_deadline(timeout_s)
 
         if not self.is_running():
             self.start()
 
-        while True:
-            if self.is_ready():
-                return
+        while not self.is_ready():
             if not self.is_running():
                 raise RuntimeError("WhisperCPP server process exited before it became ready")
             if deadline is not None and time.monotonic() >= deadline:
                 raise TimeoutError("Timed out waiting for WhisperCPP server to become ready")
-            time.sleep(poll_interval_s)
+            time.sleep(poll_interval)
 
     def inference(
         self,
@@ -353,6 +385,7 @@ class WhisperCppServer:
                         "temperature_inc": str(temperature_inc),
                         "response_format": "verbose_json",
                     },
+                    timeout=self._request_timeout,
                 )
             response.raise_for_status()
             response_json = response.json()
@@ -367,9 +400,10 @@ class WhisperCppServer:
         response = requests.post(
             url,
             files={"model": (None, str(model))},
+            timeout=self._request_timeout,
         )
         response.raise_for_status()
         return response
 
 
-__all__ = ["WhisperCppServer", "WhisperCppServerOptions", "VoiceActivityDetectionOptions"]
+__all__ = ["VoiceActivityDetectionOptions", "WhisperCppServer", "WhisperCppServerOptions"]
