@@ -50,4 +50,4 @@ def download_vad_model(
     return DownloadResult(model=model, url=url, filepath=savepath, existed=existed)
 
 
-__all__ = ["download_vad_model", "AVAILABLE_VAD_MODELS"]
+__all__ = ["AVAILABLE_VAD_MODELS", "download_vad_model"]

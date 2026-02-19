@@ -7,10 +7,10 @@ from whispercpppy.server import (
 )
 
 __all__ = [
-    "download_model",
     "AVAILABLE_MODELS",
+    "InferenceJSONVerbose",
+    "VoiceActivityDetectionOptions",
     "WhisperCppServer",
     "WhisperCppServerOptions",
-    "VoiceActivityDetectionOptions",
-    "InferenceJSONVerbose",
+    "download_model",
 ]
