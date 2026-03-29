@@ -1,6 +1,6 @@
 [project]
 name = "whispercpppy"
-version = "0.1.4"
+version = "0.1.2"
 description = "Python wrapper around whisper.cpp server"
 authors = [{ name = "zigai", email = "ziga.ivansek@gmail.com" }]
 license = { file = "LICENSE" }
@@ -27,8 +27,17 @@ whispercpp-download = "whispercpppy.cli:model_cli"
 whispercpp-download-vad = "whispercpppy.cli:vad_model_cli"
 
 [project.optional-dependencies]
-test = ["pytest", "coverage"]
-dev = ["pytest", "coverage", "ruff", "pre-commit", "mypy", "codespell"]
+test = ["pytest>=9.0.2", "coverage>=7.13.5"]
+dev = [
+    "pytest>=9.0.2",
+    "coverage>=7.13.5",
+    "ruff==0.15.8",
+    "pre-commit>=4.5.1",
+    "mypy>=1.19.1",
+    "codespell>=2.4.2",
+    "rattle-lint>=1.0.4",
+    "rattle-blank-lines>=0.2.4",
+]
 
 [project.urls]
 Repository = "https://github.com/zigai/whisper.cpp.py"
@@ -83,6 +92,11 @@ ignore_missing_imports = true
 
 [tool.codespell]
 skip = ".git,uv.lock"
+
+[tool.rattle]
+root = true
+enable = ["rattle_blank_lines.rules"]
+disable = ["rattle.rules"]
 
 [tool.ruff]
 line-length = 100
