@@ -31,6 +31,7 @@ def prepare_vad_download(
     download_dir.mkdir(parents=True, exist_ok=True)
     url = build_vad_model_url(model)
     savepath = download_dir / model
+
     return url, savepath
 
 
@@ -47,6 +48,7 @@ def download_vad_model(
 
     print(f"downloading VAD model {model} to {savepath.resolve()}")
     stream_download(url, savepath, timeout=timeout)
+
     return DownloadResult(model=model, url=url, filepath=savepath, existed=existed)
 
 

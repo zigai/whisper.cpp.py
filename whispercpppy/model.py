@@ -55,8 +55,11 @@ def default_download_path(cwd: Path | None = None) -> Path:
         download_path = Path(env_models_dir)
         if not download_path.is_absolute():
             raise ValueError("'WHISPERCPP_MODELS_DIR' must be an absolute path")
+
         download_path.mkdir(parents=True, exist_ok=True)
+
         return download_path
+
     return cwd or Path.cwd()
 
 
@@ -71,6 +74,7 @@ def build_model_url(model: str) -> str:
     else:
         base_url = "https://huggingface.co/ggerganov/whisper.cpp"
         prefix = "resolve/main/ggml"
+
     return f"{base_url}/{prefix}-{model}.bin"
 
 
@@ -81,6 +85,7 @@ def prepare_download(model: str, models_dir: Path | None = None) -> tuple[str, P
     download_dir.mkdir(parents=True, exist_ok=True)
     url = build_model_url(model)
     savepath = download_dir / model
+
     return url, savepath
 
 
@@ -118,6 +123,7 @@ def stream_download(
                                 end="\r",
                                 flush=True,
                             )
+
                             progress_printed = True
                             next_report = min(total, downloaded + report_every)
                     elif downloaded >= next_report:
@@ -127,6 +133,7 @@ def stream_download(
                             end="\r",
                             flush=True,
                         )
+
                         progress_printed = True
                         next_report = downloaded + report_every
 
@@ -140,12 +147,15 @@ def stream_download(
             else:
                 downloaded_mb = downloaded / mb
                 print(f"  downloaded {downloaded_mb:.1f} MB", flush=True)
+
         tmp.replace(savepath)
     except Exception:
         if progress_printed:
             print()
+
         if tmp.exists():
             tmp.unlink(missing_ok=True)
+
         raise
 
 
@@ -161,8 +171,10 @@ def download_model(
     existed = savepath.is_file()
     if existed and not overwrite:
         return DownloadResult(model=model, url=url, filepath=savepath, existed=True)
+
     print(f"downloading {model} to {savepath.resolve()}")
     stream_download(url, savepath, timeout=timeout)
+
     return DownloadResult(model=model, url=url, filepath=savepath, existed=existed)
 
 

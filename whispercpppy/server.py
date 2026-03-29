@@ -91,12 +91,16 @@ CLIArgValue = bool | int | float | str | None
 def field_to_cli_arg(flag: str, value: CLIArgValue) -> list[str] | None:
     if value is None:
         return None
+
     if isinstance(value, bool):
         if value:
             return [flag]
+
         return None
+
     if isinstance(value, str) and value == "":
         return None
+
     return [flag, str(value)]
 
 
@@ -125,11 +129,13 @@ def resolve_executable(command: str) -> str:
             raise RuntimeError(f"Executable not found: {command}")
         if not os.access(candidate, os.X_OK):
             raise RuntimeError(f"Executable is not executable: {command}")
+
         return str(candidate.resolve())
 
     resolved_command = shutil.which(command)
     if resolved_command is None:
         raise RuntimeError(f"Executable not found in PATH: {command}")
+
     return resolved_command
 
 
@@ -193,6 +199,7 @@ def generate_start_server_command(
     binary: str = "whisper-server",
 ) -> list[str]:
     command: list[str] = [binary]
+
     for name, info in WhisperCppServerOptions.model_fields.items():
         if name == "flash_attn" and server_opts.no_flash_attn:
             continue
@@ -211,6 +218,7 @@ def generate_start_server_command(
             if arg is None:
                 continue
             command.extend(arg)
+
     return command
 
 
@@ -301,6 +309,7 @@ class WhisperCppServer:
     def is_running(self) -> bool:
         if self._process is None:
             return False
+
         return self._process.poll() is None
 
     def is_ready(self) -> bool:
@@ -321,6 +330,7 @@ class WhisperCppServer:
                 response = requests.get(url, timeout=self._ready_probe_timeout)
             except requests.RequestException:
                 return False
+
             return 200 <= response.status_code < 400
 
         return False
@@ -329,6 +339,7 @@ class WhisperCppServer:
         interval = self._ready_interval if poll_interval_s is None else poll_interval_s
         if interval <= 0:
             raise ValueError("'poll_interval_s' must be positive")
+
         return interval
 
     def _resolve_deadline(self, timeout_s: float | None) -> float | None:
@@ -337,6 +348,7 @@ class WhisperCppServer:
             raise ValueError("'timeout_s' must be non-negative or None")
         if timeout is None:
             return None
+
         return time.monotonic() + timeout
 
     def _wait_until_ready(
@@ -353,8 +365,10 @@ class WhisperCppServer:
         while not self.is_ready():
             if not self.is_running():
                 raise RuntimeError("WhisperCPP server process exited before it became ready")
+
             if deadline is not None and time.monotonic() >= deadline:
                 raise TimeoutError("Timed out waiting for WhisperCPP server to become ready")
+
             time.sleep(poll_interval)
 
     def inference(
@@ -364,6 +378,7 @@ class WhisperCppServer:
         temperature_inc: float = 0.2,
     ) -> InferenceJSONVerbose:
         self._wait_until_ready()
+
         url = self._get_url(self._server_options.inference_path)
 
         if isinstance(file, str):
@@ -389,6 +404,7 @@ class WhisperCppServer:
                 )
             response.raise_for_status()
             response_json = response.json()
+
             return InferenceJSONVerbose(**response_json)
         finally:
             if temp_audio_path is not None:
@@ -403,6 +419,7 @@ class WhisperCppServer:
             timeout=self._request_timeout,
         )
         response.raise_for_status()
+
         return response
 
 

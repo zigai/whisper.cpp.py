@@ -51,6 +51,7 @@ def create_parser(
         help="timeout for the download request in seconds.",
         metavar="\b",
     )
+
     return parser
 
 
@@ -70,6 +71,7 @@ def run_cli(
 
         if result.existed and not args.overwrite:
             print(f"{result.filepath} already exists. Skipping download.")
+
     return os.EX_OK
 
 
