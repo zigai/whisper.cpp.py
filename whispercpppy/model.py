@@ -81,6 +81,7 @@ def build_model_url(model: str) -> str:
 def prepare_download(model: str, models_dir: Path | None = None) -> tuple[str, Path]:
     if not is_valid_model(model):
         raise ValueError(f"Invalid model: {model}")
+
     download_dir = models_dir or default_download_path()
     download_dir.mkdir(parents=True, exist_ok=True)
     url = build_model_url(model)

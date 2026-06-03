@@ -203,6 +203,7 @@ def generate_start_server_command(
     for name, info in WhisperCppServerOptions.model_fields.items():
         if name == "flash_attn" and server_opts.no_flash_attn:
             continue
+
         desc = info.description
         assert desc is not None
         arg = field_to_cli_arg(desc, getattr(server_opts, name))
@@ -247,10 +248,8 @@ class WhisperCppServer:
         self._ready_interval = ready_check_interval_s
         self._ready_probe_timeout = ready_probe_timeout_s
         self._request_timeout = request_timeout_s
-
         self._server_options = server_options
         self._vad_options = vad_options
-
         self._binary = binary
         self._process: subprocess.Popen[bytes] | None = None
         self._base_url = f"http://{server_options.host}:{server_options.port}"
@@ -261,6 +260,7 @@ class WhisperCppServer:
     def start(self) -> None:
         if self._process is not None and self.is_running():
             return
+
         command = generate_start_server_command(
             self._server_options,
             self._vad_options,
