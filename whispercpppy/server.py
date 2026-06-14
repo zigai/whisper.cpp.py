@@ -140,9 +140,8 @@ def resolve_executable(command: str) -> str:
 
 
 def video_to_mono16k_wav(path: Path) -> Path:
-    fd, temp_path = tempfile.mkstemp(suffix=".wav")
-    os.close(fd)
-    audio_path = Path(temp_path)
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+        audio_path = Path(temp_file.name)
 
     try:
         ffmpeg_command = resolve_executable("ffmpeg")
