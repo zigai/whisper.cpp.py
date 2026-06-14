@@ -291,22 +291,6 @@ class WhisperCppServer:
 
         self._process = None
 
-    def _get_url(self, path: str) -> str:
-        segments: list[str] = []
-
-        base_path = self._server_options.request_path
-        if base_path:
-            segments.append(base_path.strip("/"))
-
-        normalized = path.strip("/")
-        if normalized:
-            segments.append(normalized)
-
-        if not segments:
-            return self._base_url
-
-        return f"{self._base_url}/{'/'.join(segments)}"
-
     def is_running(self) -> bool:
         if self._process is None:
             return False
@@ -335,42 +319,6 @@ class WhisperCppServer:
             return 200 <= response.status_code < 400
 
         return False
-
-    def _resolve_poll_interval(self, poll_interval_s: float | None) -> float:
-        interval = self._ready_interval if poll_interval_s is None else poll_interval_s
-        if interval <= 0:
-            raise ValueError("'poll_interval_s' must be positive")
-
-        return interval
-
-    def _resolve_deadline(self, timeout_s: float | None) -> float | None:
-        timeout = self._ready_timeout if timeout_s is None else timeout_s
-        if timeout is not None and timeout < 0:
-            raise ValueError("'timeout_s' must be non-negative or None")
-        if timeout is None:
-            return None
-
-        return time.monotonic() + timeout
-
-    def _wait_until_ready(
-        self,
-        timeout_s: float | None = None,
-        poll_interval_s: float | None = None,
-    ) -> None:
-        poll_interval = self._resolve_poll_interval(poll_interval_s)
-        deadline = self._resolve_deadline(timeout_s)
-
-        if not self.is_running():
-            self.start()
-
-        while not self.is_ready():
-            if not self.is_running():
-                raise RuntimeError("WhisperCPP server process exited before it became ready")
-
-            if deadline is not None and time.monotonic() >= deadline:
-                raise TimeoutError("Timed out waiting for WhisperCPP server to become ready")
-
-            time.sleep(poll_interval)
 
     def inference(
         self,
@@ -422,6 +370,58 @@ class WhisperCppServer:
         response.raise_for_status()
 
         return response
+
+    def _get_url(self, path: str) -> str:
+        segments: list[str] = []
+
+        base_path = self._server_options.request_path
+        if base_path:
+            segments.append(base_path.strip("/"))
+
+        normalized = path.strip("/")
+        if normalized:
+            segments.append(normalized)
+
+        if not segments:
+            return self._base_url
+
+        return f"{self._base_url}/{'/'.join(segments)}"
+
+    def _resolve_poll_interval(self, poll_interval_s: float | None) -> float:
+        interval = self._ready_interval if poll_interval_s is None else poll_interval_s
+        if interval <= 0:
+            raise ValueError("'poll_interval_s' must be positive")
+
+        return interval
+
+    def _resolve_deadline(self, timeout_s: float | None) -> float | None:
+        timeout = self._ready_timeout if timeout_s is None else timeout_s
+        if timeout is not None and timeout < 0:
+            raise ValueError("'timeout_s' must be non-negative or None")
+        if timeout is None:
+            return None
+
+        return time.monotonic() + timeout
+
+    def _wait_until_ready(
+        self,
+        timeout_s: float | None = None,
+        poll_interval_s: float | None = None,
+    ) -> None:
+        poll_interval = self._resolve_poll_interval(poll_interval_s)
+        deadline = self._resolve_deadline(timeout_s)
+
+        if not self.is_running():
+            self.start()
+
+        while not self.is_ready():
+            if not self.is_running():
+                raise RuntimeError("WhisperCPP server process exited before it became ready")
+
+            if deadline is not None and time.monotonic() >= deadline:
+                raise TimeoutError("Timed out waiting for WhisperCPP server to become ready")
+
+            time.sleep(poll_interval)
 
 
 __all__ = ["VoiceActivityDetectionOptions", "WhisperCppServer", "WhisperCppServerOptions"]
