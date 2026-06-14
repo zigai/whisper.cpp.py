@@ -208,6 +208,7 @@ def generate_start_server_command(
         arg = field_to_cli_arg(desc, getattr(server_opts, name))
         if arg is None:
             continue
+
         command.extend(arg)
 
     if vad_opts is not None and vad_opts.enable:
@@ -217,6 +218,7 @@ def generate_start_server_command(
             arg = field_to_cli_arg(desc, getattr(vad_opts, name))
             if arg is None:
                 continue
+
             command.extend(arg)
 
     return command

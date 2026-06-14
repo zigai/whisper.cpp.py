@@ -111,6 +111,7 @@ def stream_download(
                 for chunk in r.iter_content(chunk_size=chunk_size):
                     if not chunk:
                         continue
+
                     f.write(chunk)
                     downloaded += len(chunk)
 
