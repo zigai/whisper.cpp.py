@@ -3,13 +3,13 @@ name = "whispercpppy"
 version = "0.1.2"
 description = "Python wrapper around whisper.cpp server"
 authors = [{ name = "zigai", email = "ziga.ivansek@gmail.com" }]
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["pydantic>=2.11.9", "requests>=2.32.5"]
+dependencies = ["pydantic>=2.12.0", "requests>=2.32.5"]
 classifiers = [
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -31,7 +31,7 @@ test = ["pytest>=9.0.3", "coverage>=7.14.1"]
 dev = [
     "pytest>=9.0.3",
     "coverage>=7.14.1",
-    "ruff==0.15.16",
+    "ruff==0.16.1",
     "pre-commit>=4.6.0",
     "pyrefly>=1.0.0",
     "codespell>=2.4.2",
@@ -44,22 +44,12 @@ Issues = "https://github.com/zigai/whisper.cpp.py/issues"
 Homepage = "https://github.com/zigai/whisper.cpp.py"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.11.25,<0.12.0"]
+build-backend = "uv_build"
 
-[tool.hatch.build.targets.wheel]
-packages = ["whispercpppy"]
-
-[tool.hatch.envs.test]
-features = ["test"]
-installer = "uv"
-
-[[tool.hatch.envs.test.matrix]]
-python = ["3.12", "3.13", "3.14"]
-
-[tool.hatch.envs.test.scripts]
-test = "pytest -v {args}"
-cov = "coverage run -m pytest {args}"
+[tool.uv.build-backend]
+module-name = "whispercpppy"
+module-root = ""
 
 [tool.coverage.run]
 source = ["whispercpppy"]
@@ -162,6 +152,7 @@ ignore = [
     "PLC0415",
     "PLR0904",
     "PLR0913",
+    "PLR0917",
     "PLR2004",
     "PLR1711",
     "TRY003",
@@ -245,3 +236,10 @@ known-first-party = ["whispercpppy", "tests"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.uv]
+default-groups = ["test"]
+
+[dependency-groups]
+test = ["pytest>=9.0.3", "coverage>=7.14.1"]
+dev = [{include-group = "test"}, "ruff==0.16.1", "pre-commit>=4.6.0", "pyrefly>=1.0.0", "codespell>=2.4.2", "rattle-lint>=2.5.1"]
