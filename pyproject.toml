@@ -35,7 +35,7 @@ dev = [
     "pre-commit>=4.6.0",
     "pyrefly>=1.0.0",
     "codespell>=2.4.2",
-    "rattle-lint>=3.0.0",
+    "rattle-lint>=3.3.0",
 ]
 
 [project.urls]
@@ -242,4 +242,4 @@ default-groups = ["test"]
 
 [dependency-groups]
 test = ["pytest>=9.0.3", "coverage>=7.14.1"]
-dev = [{include-group = "test"}, "ruff==0.16.10", "pre-commit>=4.6.0", "pyrefly>=1.0.0", "codespell>=2.4.2", "rattle-lint>=3.0.0"]
+dev = [{include-group = "test"}, "ruff==0.16.10", "pre-commit>=4.6.0", "pyrefly>=1.0.0", "codespell>=2.4.2", "rattle-lint>=3.3.0"]
